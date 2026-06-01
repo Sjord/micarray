@@ -11,7 +11,7 @@ sock.bind((UDP_IP, UDP_PORT))
 with wave.open(FILENAME, 'wb') as wav:
     wav.setnchannels(2)      # 2 channels (Left and Right)
     wav.setsampwidth(3)      # 24-bit (3 bytes per sample)
-    wav.setframerate(16000)  # sample rate
+    wav.setframerate(22050)  # sample rate
 
     print("Recording tightly packed 24-bit audio stream...")
     try:

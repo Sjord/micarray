@@ -11,7 +11,7 @@
 // --- Configuration ---
 #define UDP_IP    "192.168.6.48" // IP of your computer
 #define UDP_PORT  8888
-#define SAMPLES_PER_READ 128
+#define SAMPLES_PER_READ 240
 
 // --- WiFi Event Handler ---
 static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data) {
@@ -39,7 +39,7 @@ void app_main(void) {
     i2s_new_channel(&chan_cfg, NULL, &rx_handle);
 
     i2s_std_config_t std_cfg = {
-        .clk_cfg = I2S_STD_CLK_DEFAULT_CONFIG(16000),
+        .clk_cfg = I2S_STD_CLK_DEFAULT_CONFIG(22050),
         .slot_cfg = I2S_STD_MSB_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_32BIT, I2S_SLOT_MODE_STEREO),
         .gpio_cfg = { .bclk = 33, .ws = 25, .din = 32, .dout = I2S_GPIO_UNUSED, .mclk = I2S_GPIO_UNUSED,
                       .invert_flags = { .bclk_inv = true, .ws_inv = false } },
