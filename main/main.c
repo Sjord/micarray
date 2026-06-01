@@ -13,6 +13,9 @@
 #define UDP_PORT  8888
 #define SAMPLES_PER_READ 240
 
+int32_t raw_buffer[SAMPLES_PER_READ];
+uint8_t packed_buffer[SAMPLES_PER_READ * 3];
+
 // --- WiFi Event Handler ---
 static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data) {
     if (event_id == WIFI_EVENT_STA_START) esp_wifi_connect();
@@ -55,8 +58,6 @@ void app_main(void) {
     int sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_IP);
     struct sockaddr_in dest_addr = { .sin_family = AF_INET, .sin_port = htons(UDP_PORT), .sin_addr.s_addr = inet_addr(UDP_IP) };
 
-    int32_t raw_buffer[SAMPLES_PER_READ]; // Holds 64 samples (32 stereo frames)
-    uint8_t packed_buffer[SAMPLES_PER_READ * 3]; // 32 frames * 2 channels * 3 bytes = 192 bytes
     size_t r_bytes = 0;
 
     while (1) {
