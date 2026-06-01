@@ -18,6 +18,22 @@ static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_
     if (event_id == WIFI_EVENT_STA_START) esp_wifi_connect();
 }
 
+i2s_chan_handle_t setup_i2s(int port, int pin, i2s_role_t role) {
+    i2s_chan_handle_t rx_handle;
+    i2s_chan_config_t chan_cfg = I2S_CHANNEL_DEFAULT_CONFIG(port, role);
+    i2s_new_channel(&chan_cfg, NULL, &rx_handle);
+
+    i2s_std_config_t std_cfg = {
+        .clk_cfg = I2S_STD_CLK_DEFAULT_CONFIG(22050),
+        .slot_cfg = I2S_STD_MSB_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_32BIT, I2S_SLOT_MODE_STEREO),
+        .gpio_cfg = { .bclk = 33, .ws = 25, .din = pin, .dout = I2S_GPIO_UNUSED, .mclk = I2S_GPIO_UNUSED,
+                      .invert_flags = { .bclk_inv = true, .ws_inv = false } },
+    };
+    i2s_channel_init_std_mode(rx_handle, &std_cfg);
+    i2s_channel_enable(rx_handle);
+    return rx_handle;
+}
+
 void app_main(void) {
     nvs_flash_init();
     esp_netif_init();
@@ -33,19 +49,7 @@ void app_main(void) {
     esp_wifi_set_config(WIFI_IF_STA, &wifi_config);
     esp_wifi_start();
 
-    // Setup I2S (Keep your working settings here)
-    i2s_chan_handle_t rx_handle;
-    i2s_chan_config_t chan_cfg = I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_0, I2S_ROLE_MASTER);
-    i2s_new_channel(&chan_cfg, NULL, &rx_handle);
-
-    i2s_std_config_t std_cfg = {
-        .clk_cfg = I2S_STD_CLK_DEFAULT_CONFIG(22050),
-        .slot_cfg = I2S_STD_MSB_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_32BIT, I2S_SLOT_MODE_STEREO),
-        .gpio_cfg = { .bclk = 33, .ws = 25, .din = 32, .dout = I2S_GPIO_UNUSED, .mclk = I2S_GPIO_UNUSED,
-                      .invert_flags = { .bclk_inv = true, .ws_inv = false } },
-    };
-    i2s_channel_init_std_mode(rx_handle, &std_cfg);
-    i2s_channel_enable(rx_handle);
+    i2s_chan_handle_t rx_handle = setup_i2s(I2S_NUM_0, 32, I2S_ROLE_MASTER);
 
     // Setup UDP Socket
     int sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_IP);
