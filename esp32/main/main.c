@@ -12,9 +12,10 @@
 #define UDP_IP    "192.168.6.48" // IP of your computer
 #define UDP_PORT  8888
 #define SAMPLES_PER_READ 240
+#define I2S_CHANNEL_COUNT 2
 
-int32_t raw_buffer[SAMPLES_PER_READ];
-uint8_t packed_buffer[SAMPLES_PER_READ * 3];
+int32_t raw_buffer[I2S_CHANNEL_COUNT][SAMPLES_PER_READ];
+uint8_t packed_buffer[SAMPLES_PER_READ * 3 * I2S_CHANNEL_COUNT];
 
 // --- WiFi Event Handler ---
 static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data) {
@@ -52,7 +53,10 @@ void app_main(void) {
     esp_wifi_set_config(WIFI_IF_STA, &wifi_config);
     esp_wifi_start();
 
-    i2s_chan_handle_t rx_handle = setup_i2s(I2S_NUM_0, 32, I2S_ROLE_MASTER);
+    i2s_chan_handle_t rx_handles[I2S_CHANNEL_COUNT] = {
+        setup_i2s(I2S_NUM_0, 32, I2S_ROLE_SLAVE),
+        setup_i2s(I2S_NUM_1, 26, I2S_ROLE_MASTER)
+    };
 
     // Setup UDP Socket
     int sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_IP);
@@ -61,25 +65,29 @@ void app_main(void) {
     size_t r_bytes = 0;
 
     while (1) {
-        if (i2s_channel_read(rx_handle, raw_buffer, sizeof(raw_buffer), &r_bytes, 1000) == ESP_OK) {
-            size_t num_samples = r_bytes / sizeof(int32_t); // Should be 64
-            size_t packed_idx = 0;
+        for (int ch = 0; ch < I2S_CHANNEL_COUNT; ch++) {
+            esp_err_t res = i2s_channel_read(rx_handles[ch], raw_buffer[ch], sizeof(raw_buffer[ch]), &r_bytes, 1000);
+            if (res != ESP_OK || r_bytes != sizeof(raw_buffer[ch])) {
+                // Error
+                memset(raw_buffer[ch], 0, sizeof(raw_buffer[ch]));
+            }
+        }
 
-            for (size_t i = 0; i < num_samples; i++) {
-                // 1. Apply your working shift and mask logic
-                int32_t clean_sample = (raw_buffer[i] >> 8) & 0xFFFFFF;
-                if (clean_sample & 0x800000) {
-                    clean_sample |= -16777216;
+        size_t packed_idx = 0;
+        for (size_t i = 0; i < SAMPLES_PER_READ; i++) {
+            for (int ch = 0; ch < I2S_CHANNEL_COUNT; ch++) {
+                int32_t clean = (raw_buffer[ch][i] >> 8) & 0xFFFFFF;
+                if (clean & 0x800000) {
+                    clean |= -16777216;
                 }
 
-                // 2. Pack the 32-bit int into exactly 3 bytes (Little-Endian)
-                packed_buffer[packed_idx++] = (clean_sample >> 0) & 0xFF;
-                packed_buffer[packed_idx++] = (clean_sample >> 8) & 0xFF;
-                packed_buffer[packed_idx++] = (clean_sample >> 16) & 0xFF;
+                packed_buffer[packed_idx++] = (clean >> 0)  & 0xFF;
+                packed_buffer[packed_idx++] = (clean >> 8)  & 0xFF;
+                packed_buffer[packed_idx++] = (clean >> 16) & 0xFF;
             }
-
-            // 3. Send the tightly packed 24-bit interleaved stream
-            sendto(sock, packed_buffer, packed_idx, 0, (struct sockaddr *)&dest_addr, sizeof(dest_addr));
         }
+
+        // Send the single 1440-byte 4-channel network packet
+        sendto(sock, packed_buffer, packed_idx, 0, (struct sockaddr *)&dest_addr, sizeof(dest_addr));
     }
 }
