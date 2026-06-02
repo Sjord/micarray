@@ -7,6 +7,7 @@
 #include "lwip/sockets.h"
 #include "driver/i2s_std.h"
 #include "wifi_creds.h"
+#include "qoa.h"
 
 // --- Configuration ---
 #define UDP_IP    "192.168.6.48" // IP of your computer
@@ -15,6 +16,7 @@
 #define I2S_CHANNEL_COUNT 2
 
 int32_t raw_buffer[I2S_CHANNEL_COUNT][SAMPLES_PER_READ];
+int16_t samples_buffer[I2S_CHANNEL_COUNT * SAMPLES_PER_READ];
 uint8_t packed_buffer[SAMPLES_PER_READ * 3 * I2S_CHANNEL_COUNT];
 
 // --- WiFi Event Handler ---
@@ -64,6 +66,11 @@ void app_main(void) {
 
     size_t r_bytes = 0;
 
+    qoa_desc qoa;
+    memset(&qoa, 0, sizeof(qoa_desc));
+    qoa.channels = 4;
+    qoa.samplerate = 22050;
+
     while (1) {
         for (int ch = 0; ch < I2S_CHANNEL_COUNT; ch++) {
             esp_err_t res = i2s_channel_read(rx_handles[ch], raw_buffer[ch], sizeof(raw_buffer[ch]), &r_bytes, 1000);
@@ -73,21 +80,23 @@ void app_main(void) {
             }
         }
 
-        size_t packed_idx = 0;
+        int16_t * sample_pointer = samples_buffer;
         for (size_t i = 0; i < SAMPLES_PER_READ; i++) {
             for (int ch = 0; ch < I2S_CHANNEL_COUNT; ch++) {
-                int32_t clean = (raw_buffer[ch][i] >> 8) & 0xFFFFFF;
-                if (clean & 0x800000) {
-                    clean |= -16777216;
-                }
-
-                packed_buffer[packed_idx++] = (clean >> 0)  & 0xFF;
-                packed_buffer[packed_idx++] = (clean >> 8)  & 0xFF;
-                packed_buffer[packed_idx++] = (clean >> 16) & 0xFF;
+                int16_t clean = (raw_buffer[ch][i] >> 16) & 0xFFFF;
+                *sample_pointer = clean;
+                sample_pointer++;
             }
         }
 
+        size_t bytes_written = qoa_encode_frame(
+            samples_buffer,
+            &qoa,
+            SAMPLES_PER_READ / 2,
+            packed_buffer
+        );
+
         // Send the single 1440-byte 4-channel network packet
-        sendto(sock, packed_buffer, packed_idx, 0, (struct sockaddr *)&dest_addr, sizeof(dest_addr));
+        sendto(sock, packed_buffer, bytes_written, 0, (struct sockaddr *)&dest_addr, sizeof(dest_addr));
     }
 }
