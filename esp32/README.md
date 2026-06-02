@@ -1,0 +1,1 @@
+The ESP32 reads four microphone using two I2S channels. It sends the audio data over WiFi to receiver.py, which stores it in a WAV file.
