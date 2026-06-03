@@ -11,11 +11,11 @@
 // --- Configuration ---
 #define UDP_IP    "192.168.6.48" // IP of your computer
 #define UDP_PORT  8888
-#define SAMPLES_PER_READ 240
+#define SAMPLES_PER_READ 320
 #define I2S_CHANNEL_COUNT 2
 
 int32_t raw_buffer[I2S_CHANNEL_COUNT][SAMPLES_PER_READ];
-uint8_t packed_buffer[SAMPLES_PER_READ * 3 * I2S_CHANNEL_COUNT];
+uint8_t packed_buffer[SAMPLES_PER_READ * 2 * I2S_CHANNEL_COUNT];
 
 // --- WiFi Event Handler ---
 static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data) {
@@ -28,7 +28,7 @@ i2s_chan_handle_t setup_i2s(int port, int pin, i2s_role_t role) {
     i2s_new_channel(&chan_cfg, NULL, &rx_handle);
 
     i2s_std_config_t std_cfg = {
-        .clk_cfg = I2S_STD_CLK_DEFAULT_CONFIG(22050),
+        .clk_cfg = I2S_STD_CLK_DEFAULT_CONFIG(48000),
         .slot_cfg = I2S_STD_MSB_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_32BIT, I2S_SLOT_MODE_STEREO),
         .gpio_cfg = { .bclk = 33, .ws = 25, .din = pin, .dout = I2S_GPIO_UNUSED, .mclk = I2S_GPIO_UNUSED,
                       .invert_flags = { .bclk_inv = true, .ws_inv = false } },
@@ -76,14 +76,10 @@ void app_main(void) {
         size_t packed_idx = 0;
         for (size_t i = 0; i < SAMPLES_PER_READ; i++) {
             for (int ch = 0; ch < I2S_CHANNEL_COUNT; ch++) {
-                int32_t clean = (raw_buffer[ch][i] >> 8) & 0xFFFFFF;
-                if (clean & 0x800000) {
-                    clean |= -16777216;
-                }
+                int16_t clean = raw_buffer[ch][i] >> 16;
 
                 packed_buffer[packed_idx++] = (clean >> 0)  & 0xFF;
                 packed_buffer[packed_idx++] = (clean >> 8)  & 0xFF;
-                packed_buffer[packed_idx++] = (clean >> 16) & 0xFF;
             }
         }
 
