@@ -11,7 +11,7 @@ sock.bind((UDP_IP, UDP_PORT))
 total_samples_per_channel = 0
 # Calculate frames per network packet: ESP32 SAMPLES_PER_READ / 2
 # e.g., if SAMPLES_PER_READ is 240, each packet has 120 sample frames per channel.
-SAMPLES_PER_PACKET = 120
+SAMPLES_PER_PACKET = 600
 
 print("Recording live QOA audio stream...")
 
@@ -22,7 +22,7 @@ with open(FILENAME, 'w+b') as f:
 
     try:
         while True:
-            data, addr = sock.recvfrom(4096)
+            data, addr = sock.recvfrom(1500)
             f.write(data)
 
             # Every network packet contains our fixed frame length
